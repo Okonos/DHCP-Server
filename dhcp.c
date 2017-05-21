@@ -1,7 +1,68 @@
 #include "dhcp.h"
 
 
-void send_offer(libnet_t* ln, uint32_t xid, uint8_t* chaddr)
+libnet_ptag_t ip;
+libnet_ptag_t udp;
+libnet_ptag_t dhcp;
+
+
+void init_context(libnet_t* ln)
+{
+	uint8_t enet_dst[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+
+	dhcp = libnet_build_dhcpv4(
+			LIBNET_DHCP_REPLY,				/* opcode */
+			1,                              /* hardware type */
+			6,                              /* hardware address length */
+			0,                              /* hop count */
+			0,								/* transaction id */
+			0,                              /* seconds since bootstrap */
+			0,								/* flags */
+			0,                              /* client ip */
+			0,								/* your ip */
+			0,                              /* server ip */
+			0,                              /* gateway ip */
+			0,								/* client hardware addr */
+			NULL,                           /* server host name */
+			NULL,                           /* boot file */
+			NULL,							/* dhcp options in payload */
+			0,								/* length of options */
+			ln,                             /* libnet context */
+			0);								/* libnet ptag */
+
+	udp = libnet_build_udp(
+			67,                             /* source port */
+			68,                             /* destination port */
+			LIBNET_UDP_H + LIBNET_DHCPV4_H, /* packet size */
+			0,                              /* checksum */
+			NULL,                           /* payload */
+			0,                              /* payload size */
+			ln,                             /* libnet context */
+			0);								/* libnet ptag */
+
+	ip = libnet_build_ipv4(
+			LIBNET_IPV4_H + LIBNET_UDP_H + LIBNET_DHCPV4_H,	/* length */
+			0x10,                           /* TOS */
+			0,                              /* IP ID */
+			0,                              /* IP Frag */
+			16,                             /* TTL */
+			IPPROTO_UDP,                    /* protocol */
+			0,                              /* checksum */
+			0,								/* src ip */
+			inet_addr("255.255.255.255"),   /* destination ip */
+			NULL,                           /* payload */
+			0,                              /* payload size */
+			ln,                             /* libnet context */
+			0);								/* libnet ptag */
+
+	libnet_autobuild_ethernet(
+			enet_dst,                       /* ethernet destination */
+			ETHERTYPE_IP,                   /* protocol type */
+			ln);							/* libnet context */
+}
+
+
+void send_message(libnet_t* ln, uint8_t msgtype, uint32_t xid, uint8_t* chaddr)
 {
 	uint8_t* options;
 	uint32_t options_len;
@@ -18,8 +79,8 @@ void send_offer(libnet_t* ln, uint32_t xid, uint8_t* chaddr)
 
 	options[i++] = LIBNET_DHCP_MESSAGETYPE;
 	options[i++] = 1;
-	options[i++] = LIBNET_DHCP_MSGOFFER;
-	
+	options[i++] = msgtype;
+
 	options[i++] = LIBNET_DHCP_LEASETIME;
 	options[i++] = 4;
 	uint32_t leasetime = htonl(1200);  // seconds
@@ -43,7 +104,6 @@ void send_offer(libnet_t* ln, uint32_t xid, uint8_t* chaddr)
 	// 	memset(options + i, 0, options_len - i);
 	// }
 
-	uint8_t enet_dst[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	uint32_t client_ip = htonl(inet_addr("192.168.56.115"));
 	struct libnet_ether_addr *ethaddr;
 	ethaddr = (struct libnet_ether_addr*) chaddr;
@@ -56,7 +116,7 @@ void send_offer(libnet_t* ln, uint32_t xid, uint8_t* chaddr)
 			xid,		                    /* transaction id */
 			0,                              /* seconds since bootstrap */
 			0,								/* flags */
-			0,                              /* client ip */
+			client_ip,                      /* client ip */
 			client_ip,                      /* your ip */
 			0,                              /* server ip */
 			0,                              /* gateway ip */
@@ -66,7 +126,7 @@ void send_offer(libnet_t* ln, uint32_t xid, uint8_t* chaddr)
 			options,                        /* dhcp options in payload */
 			options_len,                    /* length of options */
 			ln,                             /* libnet context */
-			0);								/* libnet ptag */
+			dhcp);							/* libnet ptag */
 
 	libnet_build_udp(
 			67,                             /* source port */
@@ -76,7 +136,7 @@ void send_offer(libnet_t* ln, uint32_t xid, uint8_t* chaddr)
 			NULL,                           /* payload */
 			0,                              /* payload size */
 			ln,                             /* libnet context */
-			0);								/* libnet ptag */
+			udp);							/* libnet ptag */
 
 	libnet_build_ipv4(
 			LIBNET_IPV4_H + LIBNET_UDP_H + LIBNET_DHCPV4_H
@@ -92,12 +152,7 @@ void send_offer(libnet_t* ln, uint32_t xid, uint8_t* chaddr)
 			NULL,                           /* payload */
 			0,                              /* payload size */
 			ln,                             /* libnet context */
-			0);								/* libnet ptag */
-
-	libnet_autobuild_ethernet(
-			enet_dst,                       /* ethernet destination */
-			ETHERTYPE_IP,                   /* protocol type */
-			ln);							/* libnet context */
+			ip);							/* libnet ptag */
 
 	if (libnet_write(ln) == -1)
 	{

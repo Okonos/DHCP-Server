@@ -84,6 +84,8 @@ int main(int argc, char** argv)
 	printf("Listening on %s\nLibnet bound to %s\n", inet_ntoa(saddr.sin_addr),
 			libnet_addr2name4(ip, LIBNET_DONT_RESOLVE));
 
+	init_context(ln);
+
 	// main loop
 	while (1)
 	{
@@ -95,15 +97,18 @@ int main(int argc, char** argv)
 		hdr = (struct libnet_dhcpv4_hdr*) data;
 		options = data + LIBNET_DHCPV4_H;
 
-		switch (options[2])
+		switch (options[2])  // DHCP Message Type
 		{
-			case 1:
+			case LIBNET_DHCP_MSGDISCOVER:
 				printf("Received %d bytes DISCOVER packet\nSending OFFER\n", rc);
-				send_offer(ln, ntohl(hdr->dhcp_xid), hdr->dhcp_chaddr);
+				send_message(ln, LIBNET_DHCP_MSGOFFER, ntohl(hdr->dhcp_xid),
+						hdr->dhcp_chaddr);
 				break;
 
-			case 3:
+			case LIBNET_DHCP_MSGREQUEST:
 				printf("Received %d bytes REQUEST packet\n", rc);
+				send_message(ln, LIBNET_DHCP_MSGACK, ntohl(hdr->dhcp_xid),
+						hdr->dhcp_chaddr);
 				break;
 
 			default:
