@@ -116,7 +116,7 @@ void send_message(libnet_t* ln, uint8_t msgtype, uint32_t xid, uint8_t* chaddr)
 			xid,		                    /* transaction id */
 			0,                              /* seconds since bootstrap */
 			0,								/* flags */
-			client_ip,                      /* client ip */
+			0,								/* client ip */
 			client_ip,                      /* your ip */
 			0,                              /* server ip */
 			0,                              /* gateway ip */

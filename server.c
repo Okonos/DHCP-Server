@@ -2,6 +2,9 @@
 #include "dhcp.h"
 
 
+#define DHCP_MAX_SIZE 550
+
+
 libnet_t *ln;
 int sfd;
 
@@ -66,9 +69,9 @@ int main(int argc, char** argv)
 
 	int rc;
 	struct sockaddr_in saddr, caddr;
-	char *data;
+	char data[DHCP_MAX_SIZE];
 	struct libnet_dhcpv4_hdr* hdr;
-	char* options;
+	char *options;
 
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
@@ -89,12 +92,13 @@ int main(int argc, char** argv)
 	// main loop
 	while (1)
 	{
-		data = malloc(550);
+		memset(&data, 0, sizeof(data));
 		memset(&caddr, 0, sizeof(caddr));
 		socklen_t sl = sizeof(caddr);
-		rc = recvfrom(sfd, data, 550, 0, (struct sockaddr*) &caddr, &sl);
+		rc = recvfrom(sfd, data, DHCP_MAX_SIZE, 0, (struct sockaddr*) &caddr, &sl);
 
 		hdr = (struct libnet_dhcpv4_hdr*) data;
+		// pointer to dhcp packet payload
 		options = data + LIBNET_DHCPV4_H;
 
 		switch (options[2])  // DHCP Message Type
@@ -114,7 +118,5 @@ int main(int argc, char** argv)
 			default:
 				printf("Received unknown packet, ignoring\n");
 		}
-
-		free(data);
 	}
 }
