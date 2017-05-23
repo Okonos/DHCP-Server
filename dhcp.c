@@ -62,7 +62,8 @@ void init_context(libnet_t* ln)
 }
 
 
-void send_message(libnet_t* ln, uint8_t msgtype, uint32_t xid, uint8_t* chaddr)
+void send_message(libnet_t* ln, uint8_t msgtype, uint32_t client_ip, uint32_t xid,
+		uint8_t* chaddr)
 {
 	uint8_t* options;
 	uint32_t options_len;
@@ -104,7 +105,7 @@ void send_message(libnet_t* ln, uint8_t msgtype, uint32_t xid, uint8_t* chaddr)
 	// 	memset(options + i, 0, options_len - i);
 	// }
 
-	uint32_t client_ip = htonl(inet_addr("192.168.56.115"));
+	// uint32_t client_ip = htonl(inet_addr("192.168.56.115"));
 	struct libnet_ether_addr *ethaddr;
 	ethaddr = (struct libnet_ether_addr*) chaddr;
 
@@ -162,9 +163,10 @@ void send_message(libnet_t* ln, uint8_t msgtype, uint32_t xid, uint8_t* chaddr)
 
 	struct libnet_stats ls;
 	libnet_stats(ln, &ls);
-	fprintf(stderr, "Packets sent:  %lld\n"
-			"Packet errors: %lld\n"
-			"Bytes written: %lld\n",
+	fprintf(stderr, "=== Statistics so far ===\n"
+			"  Packets sent:  %lld\n"
+			"  Packet errors: %lld\n"
+			"  Bytes written: %lld\n",
 			(long long)ls.packets_sent, (long long)ls.packet_errors,
 			(long long)ls.bytes_written);
 
