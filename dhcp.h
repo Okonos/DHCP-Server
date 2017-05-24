@@ -1,7 +1,7 @@
 #include <libnet.h>
 
 
-void read_config(char*);
+void read_config(uint32_t);
 
 void init_context(libnet_t*);
 

@@ -88,11 +88,19 @@ int main(int argc, char** argv)
 			"Libnet bound to %s\n",
 			inet_ntoa(saddr.sin_addr), libnet_addr2name4(ip, LIBNET_DONT_RESOLVE));
 
-	char fname[] = "./server.conf";
-	if (access(fname, F_OK) != -1)
-		read_config(fname);
+	// get interface netmask
+	struct ifreq ifr;
+	struct sockaddr_in *nmask;
+	strncpy(ifr.ifr_name, interface_name, IFNAMSIZ);
+	ioctl(sfd, SIOCGIFNETMASK, &ifr);
+	nmask = (struct sockaddr_in*) &ifr.ifr_netmask;
+	uint32_t netmask = nmask->sin_addr.s_addr;
+	printf("Interface netmask: %s\n", ipaddr_to_str(ntohl(netmask)));
 
+	read_config(netmask);
 	init_context(ln);
+
+	printf("\n");
 
 	// main loop
 	while (1)

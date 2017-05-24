@@ -7,16 +7,24 @@ libnet_ptag_t ip;
 libnet_ptag_t udp;
 libnet_ptag_t dhcp;
 
-uint32_t mask;
+uint32_t netmask = 0;
 uint32_t router;
 char domain[50] = "";
 uint32_t dns;
 
 
-void read_config(char *filepath)
+void read_config(uint32_t iface_netmask)
 {
 	FILE *fh;
 	char buff[BUFF_SIZE];
+	char filepath[] = "./server.conf";
+
+	if (access(filepath, F_OK) == -1)
+	{
+		printf("No config file\n");
+		netmask = iface_netmask;
+		return;
+	}
 
 	fh = fopen(filepath, "r");
 
@@ -28,13 +36,13 @@ void read_config(char *filepath)
 		char tmp[16];
 
 		sscanf(buff, "%s = %s", option, value);
-		if (strcmp(option, "mask") == 0)
+		if (strcmp(option, "netmask") == 0)
 		{
 			strncpy(tmp, value, 15);
 			tmp[15] = '\0';
-			if ((mask = inet_addr(tmp)) == -1)
-				mask = inet_addr("255.255.255.0");
-			printf("Subnet mask: %s\n", ipaddr_to_str(htonl(mask)));
+			if ((netmask = inet_addr(tmp)) == -1)
+				netmask = inet_addr("255.255.255.0");
+			printf("Subnet mask: %s\n", ipaddr_to_str(htonl(netmask)));
 		}
 		else if (strcmp(option, "router") == 0)
 		{
@@ -60,6 +68,9 @@ void read_config(char *filepath)
 	}
 
 	fclose(fh);
+
+	if (!netmask)
+		netmask = iface_netmask;
 }
 
 
@@ -197,7 +208,7 @@ void reply(libnet_t* ln, int rc, unsigned char *rcvd_options, uint32_t xid,
 
 	options[i++] = LIBNET_DHCP_SUBNETMASK;
 	options[i++] = 4;
-	memcpy(options + i, (char *)&mask, 4);
+	memcpy(options + i, (char *)&netmask, 4);
 	i += 4;
 
 	if (router != 0)
