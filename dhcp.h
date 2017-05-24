@@ -5,4 +5,6 @@ void read_config(char*);
 
 void init_context(libnet_t*);
 
-void send_message(libnet_t*, uint8_t, uint32_t, uint32_t, uint8_t*);
+char* ipaddr_to_str(uint32_t);
+
+void reply(libnet_t*, int, unsigned char*, uint32_t, uint8_t*);

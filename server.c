@@ -7,12 +7,10 @@
 
 libnet_t *ln;
 int sfd;
-uint32_t *addr_pool;
 
 
 void cleanup()
 {
-	free(addr_pool);
 	close(sfd);
 	libnet_destroy(ln);
 }
@@ -21,22 +19,6 @@ void cleanup()
 void stop(int signo)
 {
 	exit(EXIT_SUCCESS);
-}
-
-
-char* ipaddr_to_str(uint32_t addr)
-{
-	struct in_addr sa;
-	sa.s_addr = htonl(addr);
-	return inet_ntoa(sa);
-}
-
-
-uint32_t get_next_address(uint32_t *addr_pool)
-{
-	// *addr_pool = htonl(ntohl(*addr_pool) + 1);
-	*addr_pool = *addr_pool + 1;
-	return *addr_pool;
 }
 
 
@@ -90,8 +72,6 @@ int main(int argc, char** argv)
 	unsigned char data[DHCP_MAX_SIZE];
 	struct libnet_dhcpv4_hdr* hdr;
 	unsigned char *options;
-	addr_pool = malloc(sizeof(uint32_t));
-	*addr_pool = htonl(inet_addr("192.168.56.150"));
 
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
@@ -103,12 +83,10 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
-	int ip = libnet_get_ipaddr4(ln);
+	uint32_t ip = libnet_get_ipaddr4(ln);
 	printf("Listening on %s\n"
 			"Libnet bound to %s\n",
 			inet_ntoa(saddr.sin_addr), libnet_addr2name4(ip, LIBNET_DONT_RESOLVE));
-
-	printf("Address pool starting at %s\n\n", ipaddr_to_str(*addr_pool));
 
 	char fname[] = "./server.conf";
 	if (access(fname, F_OK) != -1)
@@ -128,52 +106,7 @@ int main(int argc, char** argv)
 		// pointer to dhcp packet payload
 		options = data + LIBNET_DHCPV4_H;
 
-		uint32_t client_addr = 0;
-		unsigned char *opt;
-		int i = 3;
-
-		do  // parse options in search of requested ip address
-		{
-			if (*(opt = options + i) == LIBNET_DHCP_DISCOVERADDR)
-			{
-				// network format
-				memcpy(&client_addr, opt + 2, sizeof(uint32_t));
-				client_addr = ntohl(client_addr);
-				break;
-			}
-			// move to the next option
-			i += options[i+1] + 2;
-		}
-		while (*opt != LIBNET_DHCP_END && i < (rc - LIBNET_DHCPV4_H));
-
-		if (!client_addr)
-		{
-			client_addr = get_next_address(addr_pool);
-		}
-		else
-		{
-			printf("Request for %s\n", ipaddr_to_str(client_addr));
-		}
-
-		switch (options[2])  // DHCP Message Type
-		{
-			case LIBNET_DHCP_MSGDISCOVER:
-				printf("Received %d bytes DISCOVER packet\nOffering %s\n",
-						rc, ipaddr_to_str(client_addr));
-				send_message(ln, LIBNET_DHCP_MSGOFFER, (client_addr),
-						ntohl(hdr->dhcp_xid), hdr->dhcp_chaddr);
-				break;
-
-			case LIBNET_DHCP_MSGREQUEST:
-				printf("Received %d bytes REQUEST packet\nAcknowledging %s\n",
-						rc, ipaddr_to_str(client_addr));
-				send_message(ln, LIBNET_DHCP_MSGACK, (client_addr),
-						ntohl(hdr->dhcp_xid), hdr->dhcp_chaddr);
-				break;
-
-			default:
-				printf("Received unknown packet, ignoring\n");
-		}
+		reply(ln, rc, options, ntohl(hdr->dhcp_xid), hdr->dhcp_chaddr);
 
 		printf("\n");
 	}

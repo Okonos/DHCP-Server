@@ -20,6 +20,8 @@ void read_config(char *filepath)
 
 	fh = fopen(filepath, "r");
 
+	printf("Config file options:\n");
+
 	while (fgets(buff, BUFF_SIZE, fh) != NULL)
 	{
 		char option[100], value[100];
@@ -32,7 +34,7 @@ void read_config(char *filepath)
 			tmp[15] = '\0';
 			if ((mask = inet_addr(tmp)) == -1)
 				mask = inet_addr("255.255.255.0");
-			printf("%u\n", mask);
+			printf("Subnet mask: %s\n", ipaddr_to_str(htonl(mask)));
 		}
 		else if (strcmp(option, "router") == 0)
 		{
@@ -40,12 +42,12 @@ void read_config(char *filepath)
 			tmp[15] = '\0';
 			if ((router = inet_addr(tmp)) == -1)
 				router = 0;
-			printf("%u\n", router);
+			printf("Router: %s\n", ipaddr_to_str(htonl(router)));
 		}
 		else if (strcmp(option, "domain") == 0)
 		{
 			strncpy(domain, value, 50);
-			printf("%s\n", domain);
+			printf("Domain: %s\n", domain);
 		}
 		else if (strcmp(option, "dns") == 0)
 		{
@@ -53,7 +55,7 @@ void read_config(char *filepath)
 			tmp[15] = '\0';
 			if ((dns = inet_addr(tmp)) == -1)
 				dns = 0;
-			printf("%u\n", dns);
+			printf("DNS: %s\n", ipaddr_to_str(htonl(dns)));
 		}
 	}
 
@@ -117,13 +119,63 @@ void init_context(libnet_t* ln)
 }
 
 
-void send_message(libnet_t* ln, uint8_t msgtype, uint32_t client_ip, uint32_t xid,
+char* ipaddr_to_str(uint32_t addr)
+{
+	struct in_addr sa;
+	sa.s_addr = htonl(addr);
+	return inet_ntoa(sa);
+}
+
+
+uint32_t get_client_address(int rc, unsigned char *options)
+{
+	uint32_t client_addr = 0;
+	unsigned char *opt;
+	int i = 3;
+
+	do  // parse options in search of requested ip address
+	{
+		if (*(opt = options + i) == LIBNET_DHCP_DISCOVERADDR)
+		{
+			// network format
+			memcpy(&client_addr, opt + 2, sizeof(uint32_t));
+			return ntohl(client_addr);
+		}
+		// move to the next option
+		i += options[i+1] + 2;
+	}
+	while (*opt != LIBNET_DHCP_END && i < (rc - LIBNET_DHCPV4_H));
+
+	return client_addr;
+}
+
+
+void reply(libnet_t* ln, int rc, unsigned char *rcvd_options, uint32_t xid,
 		uint8_t* chaddr)
 {
+	uint8_t replytype;
 	uint8_t* options;
 	uint32_t options_len;
 	uint32_t server_ip;
 	int i = 0;
+	static uint8_t addr_pool_offset = 10;
+
+	switch (rcvd_options[2])  // DHCP Message Type
+	{
+		case LIBNET_DHCP_MSGDISCOVER:
+			printf("Received %d bytes DISCOVER packet\n", rc);
+			replytype = LIBNET_DHCP_MSGOFFER;
+			break;
+
+		case LIBNET_DHCP_MSGREQUEST:
+			printf("Received %d bytes REQUEST packet\nAcknowledging ", rc);
+			replytype = LIBNET_DHCP_MSGACK;
+			break;
+
+		default:
+			printf("Received %d bytes unknown packet, ignoring\n", rc);
+			return;
+	}
 
 	options_len = 60; // LIBNET_BOOTP_MIN_LEN - LIBNET_DHCPV4_H;
 	options = malloc(options_len);
@@ -135,7 +187,7 @@ void send_message(libnet_t* ln, uint8_t msgtype, uint32_t client_ip, uint32_t xi
 
 	options[i++] = LIBNET_DHCP_MESSAGETYPE;
 	options[i++] = 1;
-	options[i++] = msgtype;
+	options[i++] = replytype;
 
 	options[i++] = LIBNET_DHCP_LEASETIME;
 	options[i++] = 4;
@@ -190,7 +242,16 @@ void send_message(libnet_t* ln, uint8_t msgtype, uint32_t client_ip, uint32_t xi
 	// 	memset(options + i, 0, options_len - i);
 	// }
 
-	// uint32_t client_ip = htonl(inet_addr("192.168.56.115"));
+	// TODO if !get_client_addr => server_ip + addr_pool_offset
+	uint32_t client_ip;
+	if ((client_ip = get_client_address(rc, rcvd_options)) == 0)
+	{
+		// no request
+		client_ip = ntohl(server_ip) + addr_pool_offset++;
+		printf("No IP address request, offering %s\n", ipaddr_to_str(client_ip));
+	}
+	else printf("requested %s\n", ipaddr_to_str(client_ip));
+
 	struct libnet_ether_addr *ethaddr;
 	ethaddr = (struct libnet_ether_addr*) chaddr;
 
