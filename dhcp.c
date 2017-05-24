@@ -1,9 +1,64 @@
 #include "dhcp.h"
 
+#define BUFF_SIZE 100
+
 
 libnet_ptag_t ip;
 libnet_ptag_t udp;
 libnet_ptag_t dhcp;
+
+uint32_t mask;
+uint32_t router;
+char domain[50] = "";
+uint32_t dns;
+
+
+void read_config(char *filepath)
+{
+	FILE *fh;
+	char buff[BUFF_SIZE];
+
+	fh = fopen(filepath, "r");
+
+	while (fgets(buff, BUFF_SIZE, fh) != NULL)
+	{
+		char option[100], value[100];
+		char tmp[16];
+
+		sscanf(buff, "%s = %s", option, value);
+		if (strcmp(option, "mask") == 0)
+		{
+			strncpy(tmp, value, 15);
+			tmp[15] = '\0';
+			if ((mask = inet_addr(tmp)) == -1)
+				mask = inet_addr("255.255.255.0");
+			printf("%u\n", mask);
+		}
+		else if (strcmp(option, "router") == 0)
+		{
+			strncpy(tmp, value, 15);
+			tmp[15] = '\0';
+			if ((router = inet_addr(tmp)) == -1)
+				router = 0;
+			printf("%u\n", router);
+		}
+		else if (strcmp(option, "domain") == 0)
+		{
+			strncpy(domain, value, 50);
+			printf("%s\n", domain);
+		}
+		else if (strcmp(option, "dns") == 0)
+		{
+			strncpy(tmp, value, 15);
+			tmp[15] = '\0';
+			if ((dns = inet_addr(tmp)) == -1)
+				dns = 0;
+			printf("%u\n", dns);
+		}
+	}
+
+	fclose(fh);
+}
 
 
 void init_context(libnet_t* ln)
@@ -70,7 +125,7 @@ void send_message(libnet_t* ln, uint8_t msgtype, uint32_t client_ip, uint32_t xi
 	uint32_t server_ip;
 	int i = 0;
 
-	options_len = 60;
+	options_len = 60; // LIBNET_BOOTP_MIN_LEN - LIBNET_DHCPV4_H;
 	options = malloc(options_len);
 	options[i++] = LIBNET_DHCP_SERVIDENT;
 	options[i++] = 4;
@@ -90,14 +145,44 @@ void send_message(libnet_t* ln, uint8_t msgtype, uint32_t client_ip, uint32_t xi
 
 	options[i++] = LIBNET_DHCP_SUBNETMASK;
 	options[i++] = 4;
-	uint32_t subnetmask = inet_addr("255.255.255.0");
-	memcpy(options + i, (char *)&subnetmask, 4);
+	memcpy(options + i, (char *)&mask, 4);
 	i += 4;
+
+	if (router != 0)
+	{
+		options[i++] = LIBNET_DHCP_ROUTER;
+		options[i++] = 4;
+		memcpy(options + i, (char *)&router, 4);
+		i += 4;
+	}
+
+	if (dns != 0)
+	{
+		options[i++] = LIBNET_DHCP_DNS;
+		options[i++] = 4;
+		memcpy(options + i, (char *)&dns, 4);
+		i += 4;
+	}
+
+	if (strcmp(domain, "") != 0)
+	{
+		int len = strlen(domain);
+		if (i + len + 1 > options_len)
+		{
+			options_len = i + len + 1;
+			options = realloc(options, options_len);
+		}
+		options[i++] = LIBNET_DHCP_DOMAINNAME;
+		options[i++] = len;
+		memcpy(options + i, domain, len);
+		i += len;
+	}
 
 	options[i++] = LIBNET_DHCP_END;
 
 	// add padding
-	memset(options + i, 0, options_len - i);
+	if (i < options_len)
+		memset(options + i, 0, options_len - i);
 	// if (options_len + LIBNET_DHCPV4_H < LIBNET_BOOTP_MIN_LEN)
 	// {
 	// 	options_len = LIBNET_BOOTP_MIN_LEN - LIBNET_DHCPV4_H;

@@ -110,6 +110,10 @@ int main(int argc, char** argv)
 
 	printf("Address pool starting at %s\n\n", ipaddr_to_str(*addr_pool));
 
+	char fname[] = "./server.conf";
+	if (access(fname, F_OK) != -1)
+		read_config(fname);
+
 	init_context(ln);
 
 	// main loop
@@ -128,7 +132,7 @@ int main(int argc, char** argv)
 		unsigned char *opt;
 		int i = 3;
 
-		do
+		do  // parse options in search of requested ip address
 		{
 			if (*(opt = options + i) == LIBNET_DHCP_DISCOVERADDR)
 			{
