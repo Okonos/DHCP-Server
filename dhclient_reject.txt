@@ -1,0 +1,6 @@
+# /etc/dhclient.conf
+
+interface "eth0"
+{
+	reject 192.168.56.100;
+}
