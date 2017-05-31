@@ -246,14 +246,7 @@ void reply(libnet_t* ln, int rc, unsigned char *rcvd_options, uint32_t xid,
 	// add padding
 	if (i < options_len)
 		memset(options + i, 0, options_len - i);
-	// if (options_len + LIBNET_DHCPV4_H < LIBNET_BOOTP_MIN_LEN)
-	// {
-	// 	options_len = LIBNET_BOOTP_MIN_LEN - LIBNET_DHCPV4_H;
-	// 	options = realloc(options, options_len);
-	// 	memset(options + i, 0, options_len - i);
-	// }
 
-	// TODO if !get_client_addr => server_ip + addr_pool_offset
 	uint32_t client_ip;
 	if ((client_ip = get_client_address(rc, rcvd_options)) == 0)
 	{

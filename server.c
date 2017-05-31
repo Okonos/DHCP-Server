@@ -56,17 +56,6 @@ int main(int argc, char** argv)
 		exit(EXIT_FAILURE);
 	}
 
-	// bind to interface
-	// struct ifreq ifr;
-	// // ifr.ifr_name po prostu?
-	// strncpy(ifr.ifr_ifrn.ifrn_name, interface_name, IFNAMSIZ);
-	// res = setsockopt(sfd, SOL_SOCKET, SO_BINDTODEVICE, (void *) &ifr, sizeof(ifr));
-	// if (res < 0)
-	// {
-	// 	fprintf(stderr, "Error binding socket to interface\n");
-	// 	exit(EXIT_FAILURE);
-	// }
-
 	int rc;
 	struct sockaddr_in saddr, caddr;
 	unsigned char data[DHCP_MAX_SIZE];
