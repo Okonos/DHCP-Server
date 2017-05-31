@@ -41,7 +41,7 @@ void read_config(uint32_t iface_netmask)
 			strncpy(tmp, value, 15);
 			tmp[15] = '\0';
 			if ((netmask = inet_addr(tmp)) == -1)
-				netmask = inet_addr("255.255.255.0");
+				netmask = iface_netmask;
 			printf("Subnet mask: %s\n", ipaddr_to_str(htonl(netmask)));
 		}
 		else if (strcmp(option, "router") == 0)
